@@ -27,23 +27,23 @@ It is especially useful for deep learning, scientific computing, and any applica
 ```bash
 pip install tensor-mosaic
 ```
-```
+
 
 ## Quick Start
 
-```
+
 
 ---
-
-import tensor_mosaic as Mosaic  # Alias locally if you like
-
-mosaic = Mosaic()
-mosaic.inputs = 16
-mosaic.hidden = 32
-mosaic.outputs = 10
-
+```
 import torch
-tensor = torch.randn(1, mosaic.width)  # Reserve total width
+import tensor_mosaic as mosaic  # Alias locally if you like
+
+mosaic = mosaic.Mosaic()
+mosaic.INPUTS = 16
+mosaic.HIDDEN = 32
+mosaic.OUTPUTS = 10
+
+tensor = torch.randn(1, *mosaic.shape)  # Reserve total width
 
 inputs_view = mosaic.slice_view(tensor, "inputs")
 outputs_view = mosaic["outputs"]
@@ -51,4 +51,4 @@ outputs_view = mosaic["outputs"]
 print("Inputs:", inputs_view)
 print("Outputs:", outputs_view)
 ```
-```
+
