@@ -1,18 +1,37 @@
-# Mosaic (tensor-mosaic)
+# Mosaic <br><sub><sup>(tensor-mosaic)</sup></sub>
 
-> **Flexible tensor view allocator and cache for deep learning and scientific computing.**
+<p align="center">
+  <img alt="Mosaic logo" src="https://github.com/btrainwilson/tensor-mosaic/blob/main/.github/logo.png?raw=true" width="150">
+</p>
 
-[![Latest Version on PyPI](https://img.shields.io/pypi/v/tensor-mosaic.svg)](https://pypi.python.org/pypi/tensor-mosaic/)
-[![Supported Implementations](https://img.shields.io/pypi/pyversions/tensor-mosaic.svg)](https://pypi.python.org/pypi/tensor-mosaic/)
-![Build Status](https://github.com/btrainwilson/mosaic/actions/workflows/test.yaml/badge.svg)
-[![Documentation Status](https://readthedocs.org/projects/tensor-mosaic/badge/?version=latest)](https://tensor-mosaic.readthedocs.io/en/latest/?badge=latest)
-[![Coverage Status](https://coveralls.io/repos/github/btrainwilson/mosaic/badge.svg?branch=master)](https://coveralls.io/github/btrainwilson/mosaic?branch=master)
+<p align="center">
+  <b>Flexible tensor view allocator and cache for deep learning and scientific computing.</b>
+</p>
+
+<p align="center">
+  <a href="https://pypi.python.org/pypi/tensor-mosaic">
+    <img src="https://img.shields.io/pypi/v/tensor-mosaic.svg" alt="PyPI version">
+  </a>
+  <a href="https://pypi.python.org/pypi/tensor-mosaic">
+    <img src="https://img.shields.io/pypi/pyversions/tensor-mosaic.svg" alt="Supported Python versions">
+  </a>
+  <a href="https://github.com/btrainwilson/mosaic/actions/workflows/test.yaml">
+    <img src="https://github.com/btrainwilson/mosaic/actions/workflows/test.yaml/badge.svg" alt="Build Status">
+  </a>
+  <a href="https://tensor-mosaic.readthedocs.io/en/latest/?badge=latest">
+    <img src="https://readthedocs.org/projects/tensor-mosaic/badge/?version=latest" alt="Documentation Status">
+  </a>
+  <a href="https://coveralls.io/github/btrainwilson/mosaic?branch=master">
+    <img src="https://coveralls.io/repos/github/btrainwilson/mosaic/badge.svg?branch=master" alt="Coverage Status">
+  </a>
+</p>
 
 ---
 
 ## Overview
 
-**Mosaic** is a lightweight, extensible Python library for allocating and caching non-overlapping, named regions (views or slices) within large or dynamically constructed tensors.  
+**Mosaic** is a lightweight, extensible Python library for allocating and caching non-overlapping, named regions (views or slices) within large or dynamically constructed tensors.
+
 It is especially useful for deep learning, scientific computing, and any application requiring efficient management and lookup of structured tensor subspaces.
 
 - **Reserve and cache named slices:** Create stable, named regions within tensors for models, optimizers, or data pipelines.
@@ -21,6 +40,7 @@ It is especially useful for deep learning, scientific computing, and any applica
 - **Compatible with PyTorch and NumPy.**
 
 ---
+
 
 ## Installation
 
