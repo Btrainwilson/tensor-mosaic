@@ -26,8 +26,14 @@ It is especially useful for deep learning, scientific computing, and any applica
 
 ```bash
 pip install tensor-mosaic
+```
+```
 
 ## Quick Start
+
+```
+
+---
 
 import tensor_mosaic as Mosaic  # Alias locally if you like
 
@@ -44,4 +50,5 @@ outputs_view = mosaic["outputs"]
 
 print("Inputs:", inputs_view)
 print("Outputs:", outputs_view)
-
+```
+```
