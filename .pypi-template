@@ -1,0 +1,22 @@
+a_description_for_the_package: Slice Cache and Allocator for torch Tensors
+classifiers:
+- 'Development Status :: 1 - Planning'
+console_scripts: []
+first_year_of_publication: '2025'
+github_account: btrainwilson
+github_repo_name: mosaic
+keywords_describing_the_package: torch
+license: MIT
+package_module_name: tensor-mosaic
+package_name: tensor-mosaic
+package_tagline: Tensor view allocator and cache.
+package_title: Mosaic
+readme: .github/README.md
+requires:
+- torch
+scripts: []
+version: 0.8.0
+your_author_name: Blake A. Wilson
+your_email_address: wilso692@gmail.com
+your_full_name: Blake A. Wilson
+your_name: Blake A. Wilson
