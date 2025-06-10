@@ -1,98 +1,130 @@
-import torch
-from typing import Dict, Tuple, Union, Optional, Callable, Any
-from . import packers
-from .cache import SpaceCache
+from typing import Dict, Tuple, Union, Optional, Callable, Any, List
+from .backend import TorchBackend, NumpyBackend, JaxBackend
+from .packers import greedy_gap_packer
+from .slicemanager import BinManager
+
+BACKEND_MAP = {
+    "torch": TorchBackend,
+    "numpy": NumpyBackend,
+    "jax":   JaxBackend,
+}
 
 class Mosaic:
-    def __init__(self, device="cpu", cache=True, autocompile=True, strategy="greedy", batched=False):
-        self.device = torch.device(device)
-        self.requests: Dict[str, Tuple[int, ...]] = {}
-        self.slices: Dict[str, Tuple[slice, ...]] = {}
-        self.bin_shape: Optional[Tuple[int, ...]] = None
-        self._compiled = False
-        self._ndim: Optional[int] = None
+
+    def __init__(self, dim, backend="torch", device=None, cache=True, autocompile=True, strategy="greedy", batched=False):
+        self.backend_name = backend
+        self.backend = BACKEND_MAP[backend](device) if backend != "numpy" else BACKEND_MAP[backend]()
+        self.device = device
+        self.bin_manager = BinManager(dim=dim)
         self.cache_indices = cache
-        self.indices = SpaceCache(self.device) if cache else None
+        self.indices = {}
+        self._allocation_recipe: List[Dict] = []
         self._packer_map: Dict[str, Callable] = {
-            "greedy": packers.greedy_packer,
-            # "knapsack": knapsack_packer,
+            "greedy": greedy_gap_packer,
         }
         self._strategy = strategy
-        self._packer = self._packer_map[strategy]
         self.autocompile = autocompile
         self.batched = batched
 
-    def add(self, name: str, shape: Union[int, Tuple[int, ...], list]):
-        if isinstance(shape, int):
-            shape = (shape,)
-        elif isinstance(shape, list):
-            shape = tuple(shape)
-        if self._ndim is None:
-            self._ndim = len(shape)
-        elif len(shape) != self._ndim:
-            raise ValueError(f"All allocations must have dimension {self._ndim}, got {shape}")
-        self.requests[name] = shape
-        self._compiled = False
+    # ---- BinManager Pass-Through Methods ----
+    def add(self, name: str, shape=None, region=None):
+        self.bin_manager.add(name, shape=shape, region=region)
+        # Save recipe for serialization
+        self._allocation_recipe.append({
+            "name": name,
+            "shape": shape if shape is not None else None,
+            "region": region if region is not None else None,
+        })
         if self.autocompile:
             self.compile()
 
     def __setattr__(self, name, value):
+        # Allow normal setting for special/internal names
         if name in {
-            "batched", "packer", "strategy", "device", "requests", "slices", "bin_shape", "_compiled", "_ndim",
-            "cache_indices", "indices", "_packer_map", "_packer", "_strategy", "autocompile"
+            "backend", "backend_name", "device", "bin_manager", "cache_indices", "indices",
+            "_packer_map", "_strategy", "strategy", "packer", "autocompile", "batched", "_allocation_recipe"
         }:
             super().__setattr__(name, value)
-        elif isinstance(value, (int, tuple, list)):
-            self.add(name, value)
+        # Pass attribute assignments to BinManager
+        elif hasattr(self, "bin_manager"):
+            setattr(self.bin_manager, name, value)
+            # Add to allocation recipe for serialization
+            self._allocation_recipe.append({
+                "name": name,
+                "shape": value if isinstance(value, (int, tuple, list)) else None,
+                "region": value if not isinstance(value, (int, tuple, list)) else None,
+            })
         else:
-            raise TypeError("Allocation must be int, tuple, or list")
+            super().__setattr__(name, value)
 
     def __getitem__(self, name):
-        if not self._compiled:
-            self.compile()
-        if self.cache_indices and self.indices and name in self.indices:
-            return self.indices[name]
-        return self.slices[name]
+        return self.bin_manager[name]
 
     def __getattr__(self, name):
-        return self.__getitem__(name)
+        if "bin_manager" in self.__dict__:
+            try:
+                return getattr(self.bin_manager, name)
+            except AttributeError:
+                raise AttributeError(f"'Mosaic' object and its BinManager have no attribute '{name}'")
+        else:
+            raise AttributeError(f"'Mosaic' object has no attribute '{name}'")
 
     def compile(self, packer: Optional[Callable] = None):
-        packer = packer or self.packer
-        allocs, bin_shape = packer(self.requests)
-        self.slices = allocs
-        self.bin_shape = bin_shape
-        self._compiled = True
-        if self.cache_indices and self.indices:
+        packer = packer or self._packer_map[self._strategy]
+        self.bin_manager.compile(packer)
+        # Build indices for each region
+        if self.cache_indices:
             self.indices.clear()
-            for name, slices in allocs.items():
-                idx_ranges = [torch.arange(s.start, s.stop, device=self.device) for s in slices]
-                grid = torch.meshgrid(*idx_ranges, indexing="ij")
-                idx_tensor = torch.stack([g.flatten() for g in grid], dim=-1)
-                self.indices[name] = idx_tensor.squeeze()
+            for name, region in self.bin_manager.slices.items():
+                idx_ranges = [self.backend.arange(s.start, s.stop) for s in region]
+                grid = self.backend.meshgrid(idx_ranges)
+                idx_tensor = self.backend.stack([g.flatten() for g in grid], axis=-1)
+                idx_tensor = idx_tensor.squeeze()
                 if self.batched:
-                    self.indices[name] = self.indices[name].unsqueeze(0)
+                    idx_tensor = self.backend.stack([idx_tensor], axis=0)
+                self.indices[name] = idx_tensor
 
     def bin_tensor(self, fill_value=0, dtype=None):
-        if not self._compiled:
+        if not self.bin_manager._compiled:
             self.compile()
-        dtype = dtype or torch.float
-        return torch.full(self.bin_shape, fill_value, dtype=dtype, device=self.device)
+        return self.backend.full(self.bin_manager.shape, fill_value, dtype=dtype)
 
     @property
     def shape(self):
-        return self.bin_shape
+        return self.bin_manager.shape
 
     def pretty_print(self):
-        print("\nMosaic Allocations:")
-        for k, v in self.slices.items():
+        print(f"\nMosaic Allocations (backend={self.backend_name}):")
+        for k, v in self.bin_manager.slices.items():
             print(f"{k:10}: {v}")
-        print(f"Bin shape: {self.bin_shape}")
+        print(f"Bin shape: {self.shape}")
 
-    def slice_view(self, x: torch.Tensor, name: str) -> torch.Tensor:
-        if not self._compiled:
+    def slice_view(self, x, name: str):
+        if not self.bin_manager._compiled:
             self.compile()
-        return x[self.slices[name]]
+        return x[self.bin_manager[name]]
+
+    # --------- Serialization & Reload Support ---------
+    def save_allocations(self, path):
+        import json
+        with open(path, "w") as f:
+            json.dump(self._allocation_recipe, f)
+
+    @classmethod
+    def load_allocations(cls, path, dim, backend="torch", device=None, **kwargs):
+        import json
+        with open(path, "r") as f:
+            recipe = json.load(f)
+        m = cls(dim=dim, backend=backend, device=device, **kwargs)
+        for req in recipe:
+            m.add(req["name"], shape=req.get("shape"), region=req.get("region"))
+        return m
+
+    def save_bin(self, x, path):
+        self.backend.save(x, path)
+
+    def load_bin(self, path):
+        return self.backend.load(path)
 
     @property
     def strategy(self):
@@ -103,16 +135,14 @@ class Mosaic:
         if value not in self._packer_map:
             raise ValueError(f"Unknown packing strategy: {value}")
         self._strategy = value
-        self._packer = self._packer_map[value]
-        self._compiled = False  # Force recompile on next access
+        self.bin_manager._compiled = False
 
     @property
     def packer(self):
-        return self._packer
+        return self._packer_map[self._strategy]
 
     @packer.setter
     def packer(self, value: Callable):
-        self._packer = value
-        self._compiled = False  # Force recompile on next access
-
+        self._packer_map[self._strategy] = value
+        self.bin_manager._compiled = False
 

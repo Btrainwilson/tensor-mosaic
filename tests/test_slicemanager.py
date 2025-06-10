@@ -1,25 +1,13 @@
-from typing import Dict, Tuple, Union, Optional, Callable, Any
+import torch
+from tensor_mosaic import SliceManager
 
-def greedy_packer(requests: Dict[str, Tuple[int, ...]]) -> Dict[str, Tuple[slice, ...]]:
-    """
-    Naive greedy allocation: Place each shape sequentially, growing the bin as needed along the first axis.
-    Returns a dict of {alias: tuple of slices} and the bin size.
-    """
-    allocations = {}
-    pos = [0] * (len(next(iter(requests.values()))) if requests else 1)
-    max_dims = [0] * len(pos)
-    for alias, shape in requests.items():
-        slices = []
-        for i, dim in enumerate(shape):
-            start = pos[i] if i == 0 else 0
-            stop = start + dim
-            slices.append(slice(start, stop))
-            if stop > max_dims[i]:
-                max_dims[i] = stop
-        allocations[alias] = tuple(slices)
-        pos[0] += shape[0]
-    return allocations, tuple(max_dims)
+sm = SliceManager(dim=1)
 
+sm.FOO = 10                 # Dynamic allocation, shape=(10,)
+sm.BAR = (10, 20)           # Explicit region
+sm.BAZ = (20, 30)           # Explicit region (tuple)
+sm.QUX = 5                  # Dynamic allocation, shape=(5,)
+sm.SLICE = slice(4, 10, 2)  # Slice Handling
 
 def greedy_gap_packer(requests, static):
     """
@@ -30,6 +18,7 @@ def greedy_gap_packer(requests, static):
     for slices in static.values():
         s = slices[0]
         intervals.append((s.start, s.stop))
+    intervals.sort()
 
     allocs = {}
     for k, shape in requests.items():
@@ -57,3 +46,13 @@ def greedy_gap_packer(requests, static):
     all_ends = [stop for _, stop in intervals]
     bin_shape = (max(all_ends),)
     return allocs, bin_shape
+
+sm.compile(greedy_gap_packer)
+
+print(sm.slices)
+print(sm.BAR)
+print(sm.BAZ)
+print(sm.QUX)
+print(sm.FOO)
+
+print("Shape:", sm.shape)

@@ -6,3 +6,4 @@ from .plot import plot_slices
 from . import packers
 from .cache import SpaceCache
 from .mosaic import Mosaic
+from .slicemanager import BinManager
