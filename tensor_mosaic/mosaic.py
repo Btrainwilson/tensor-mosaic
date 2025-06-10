@@ -1,6 +1,6 @@
 from typing import Dict, Tuple, Union, Optional, Callable, Any, List
 from .backend import TorchBackend, NumpyBackend, JaxBackend
-from .packers import greedy_gap_packer
+from .packers import greedy_packer
 from .slicemanager import BinManager
 
 BACKEND_MAP = {
@@ -20,7 +20,7 @@ class Mosaic:
         self.indices = {}
         self._allocation_recipe: List[Dict] = []
         self._packer_map: Dict[str, Callable] = {
-            "greedy": greedy_gap_packer,
+            "greedy": greedy_packer,
         }
         self._strategy = strategy
         self.autocompile = autocompile
