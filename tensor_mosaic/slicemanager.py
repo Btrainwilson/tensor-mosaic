@@ -4,7 +4,7 @@ class BinManager:
     def __init__(self, dim: int):
         self.requests: Dict[str, Tuple[int, ...]] = {}
         self.slices: Dict[str, Tuple[slice, ...]] = {}
-        self.bin_shape: Optional[Tuple[int, ...]] = None
+        self.shape: Optional[Tuple[int, ...]] = None
         self._compiled = False
         self.dim = dim
 
@@ -58,9 +58,8 @@ class BinManager:
         self._compiled = False
 
     def __setattr__(self, name, value):
-        if name in {"requests", "slices", "bin_shape", "_compiled", "dim"}:
+        if name in {"requests", "slices", "shape", "_compiled", "dim"}:
             super().__setattr__(name, value)
-        # Try explicit region first
         elif isinstance(value, slice) or (
             isinstance(value, (tuple, list)) and (
                 all(isinstance(x, slice) for x in value) or
@@ -69,7 +68,6 @@ class BinManager:
             )
         ):
             self.add(name, region=value)
-        # Otherwise treat as shape
         elif isinstance(value, (int, tuple, list)):
             self.add(name, shape=value)
         else:
@@ -81,22 +79,34 @@ class BinManager:
         return self.slices[name]
 
     def __getattr__(self, name):
-        return self.__getitem__(name)
+        # First, check if it's a real attribute/property (e.g., 'shape')
+        if name in self.__dict__ or any(name == p for p in dir(self.__class__)):
+            return object.__getattribute__(self, name)
+        # Else, try as a bin slice
+        try:
+            return self.__getitem__(name)
+        except KeyError:
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+    def __dir__(self):
+        # For nice tab completion and inspection
+        attrs = set(super().__dir__())
+        attrs.update(self.slices.keys())
+        return sorted(attrs)
 
     def compile(self, packer: Callable):
-        allocs, bin_shape = packer(self.requests, self.slices)
+        allocs, shape = packer(self.requests, self.slices)
         self.slices.update(allocs)
-        self.bin_shape = bin_shape
+        self.shape = shape
         self._compiled = True
-
-    @property
-    def shape(self):
-        return self.bin_shape
 
 if __name__ == "__main__":
     sm = BinManager(dim=1)
+    sm.GOO = 4
     sm.add("FOO", shape=10)
 
     print("Requests:", sm.requests)
     print("Regions:", sm.slices)
-
+    print("Shape property (before compile):", sm.shape)
+    sm.compile(lambda req, slc: ({"FOO": (slice(0, 10),)}, (10,)))
+    print("Shape property (after compile):", sm.shape)

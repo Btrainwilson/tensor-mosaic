@@ -47,13 +47,10 @@ class Mosaic:
             super().__setattr__(name, value)
         # Pass attribute assignments to BinManager
         elif hasattr(self, "bin_manager"):
-            setattr(self.bin_manager, name, value)
-            # Add to allocation recipe for serialization
-            self._allocation_recipe.append({
-                "name": name,
-                "shape": value if isinstance(value, (int, tuple, list)) else None,
-                "region": value if not isinstance(value, (int, tuple, list)) else None,
-            })
+            if isinstance(value, (int, tuple, list)):
+                self.add(name, shape=value)
+            else:
+                self.add(name, region=value)
         else:
             super().__setattr__(name, value)
 
